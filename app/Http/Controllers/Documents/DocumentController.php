@@ -21,7 +21,7 @@ class DocumentController extends Controller
 
         try {
             $document = Document::where('id', $validation['file_id'])->first();
-            if (!$document) {
+            if (!$document || !Storage::exists("public/{$document->path}")) {
                 return response()->json(new WithoutDataResource(
                     Response::HTTP_NOT_FOUND,
                     'Dokumen Tidak Ditemukan',
@@ -29,22 +29,13 @@ class DocumentController extends Controller
                 ), Response::HTTP_NOT_FOUND);
             }
 
-            $filePath = public_path($document->path);
-            if (!file_exists($filePath)) {
-                return response()->json(new WithoutDataResource(
-                    Response::HTTP_NOT_FOUND,
-                    'Dokumen Tidak Ditemukan',
-                    'Dokumen path tidak tersedia di server.'
-                ), Response::HTTP_NOT_FOUND);
-            }
-
-            return response()->file($filePath);
+            return response()->file(storage_path("app/public/{$document->path}"));
         } catch (\Exception $e) {
-            // Log::error('Error fetching document: ' . $e->getMessage());
+            Log::error('Error fetching document: ' . $e->getMessage());
             return response()->json(new WithoutDataResource(
                 Response::HTTP_INTERNAL_SERVER_ERROR,
                 'Server Error',
-                'Terjadi kesalahan saat mengambil dokumen. Error: ' . $e->getMessage()
+                'Terjadi kesalahan saat mengambil dokumen.'
             ), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
@@ -55,26 +46,15 @@ class DocumentController extends Controller
 
         try {
             $file = $request->file('file');
+
             $filename = Str::random(35);
             $mimeType = $file->getClientMimeType();
             $size = $this->getFileSize($file);
-
-            // Generate UUID untuk dokumen
             $fileId = Str::uuid()->toString();
 
-            // Tentukan path penyimpanan langsung di public/documents
-            $destinationPath = public_path('documents');
-
-            // Pastikan folder ada
-            if (!file_exists($destinationPath)) {
-                mkdir($destinationPath, 0777, true);
-            }
-
-            // Simpan file di public/documents
-            $file->move($destinationPath, $filename);
-
-            // Path yang akan disimpan di database
-            $filePath = "documents/{$filename}";
+            // Simpan file (tanpa ekstensi)
+            $filePath = "documents/{$filename}"; // Simpan di storage/app/public/documents
+            Storage::put("public/{$filePath}", file_get_contents($file));
 
             $document = Document::create([
                 'id' => $fileId,
@@ -92,7 +72,7 @@ class DocumentController extends Controller
                 [
                     'file_id' => $document->id,
                     'filename' => $document->filename,
-                    'url' => asset($document->path),
+                    'url' => Storage::url("public/{$filePath}"),
                     'mime_type' => $document->mime_type,
                     'size' => $this->formatFileSize($document->size),
                 ]
@@ -113,7 +93,7 @@ class DocumentController extends Controller
 
         try {
             $document = Document::where('id', $validation['file_id'])->first();
-            if (!$document) {
+            if (!$document || !Storage::exists("public/{$document->path}")) {
                 return response()->json(new WithoutDataResource(
                     Response::HTTP_NOT_FOUND,
                     'Dokumen Tidak Ditemukan',
@@ -121,11 +101,7 @@ class DocumentController extends Controller
                 ), Response::HTTP_NOT_FOUND);
             }
 
-            $filePath = public_path($document->path);
-            if (file_exists($filePath)) {
-                unlink($filePath);
-            }
-
+            Storage::delete("public/{$document->path}");
             $document->delete();
 
             return response()->json(new WithoutDataResource(
