@@ -18,7 +18,7 @@ services:
             XDEBUG_CONFIG: "${SAIL_XDEBUG_CONFIG:-client_host=host.docker.internal}"
             IGNITION_LOCAL_SITES_PATH: "${PWD}"
         volumes:
-            - "/mnt/d/__EXIUM_PROJECT__/monolitik/SISTEM_INFORMASI_DESA/sistem_informasi_desa_dokumen:/var/www/html"
+            - "/mnt/d/__EXIUM_PROJECT__/microservices/SISTEM_INFORMASI_DESA/sistem_informasi_desa_dokumen:/var/www/html"
         networks:
             - sid-storage-network
         depends_on:
