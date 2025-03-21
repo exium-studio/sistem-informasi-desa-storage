@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Documents;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Documents\CreateDocumentRequest;
+use App\Http\Requests\Documents\CreateMultipleDocumentsRequest;
 use App\Http\Requests\Documents\GetDocumentRequest;
 use App\Http\Resources\Response\WithDataResource;
 use App\Http\Resources\Response\WithoutDataResource;
@@ -83,6 +84,58 @@ class DocumentController extends Controller
                 Response::HTTP_INTERNAL_SERVER_ERROR,
                 'Server Error',
                 'Terjadi kesalahan saat mengunggah dokumen.'
+            ), Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+    }
+
+    public function uploadMultipleFiles(CreateMultipleDocumentsRequest $request)
+    {
+        $validation = $request->validated();
+
+        try {
+            $uploadedFiles = [];
+
+            foreach ($request->file('files') as $file) {
+                $filename = Str::random(35);
+                $mimeType = $file->getClientMimeType();
+                $size = $this->getFileSize($file);
+                $fileId = Str::uuid()->toString();
+
+                // Simpan file (tanpa ekstensi)
+                $filePath = "documents/{$filename}";
+                Storage::put("public/{$filePath}", file_get_contents($file));
+
+                $document = Document::create([
+                    'id' => $fileId,
+                    'user_id' => auth()->id(),
+                    'filename' => $filename,
+                    'path' => $filePath,
+                    'mime_type' => $mimeType,
+                    'size' => $size,
+                ]);
+
+                // Simpan hasil upload ke array
+                $uploadedFiles[] = [
+                    'file_id' => $document->id,
+                    'filename' => $document->filename,
+                    'url' => Storage::url("public/{$filePath}"),
+                    'mime_type' => $document->mime_type,
+                    'size' => $this->formatFileSize($document->size),
+                ];
+            }
+
+            return response()->json(new WithDataResource(
+                Response::HTTP_CREATED,
+                'File berhasil diunggah.',
+                'Semua file berhasil diunggah ke server.',
+                $uploadedFiles
+            ), Response::HTTP_CREATED);
+        } catch (\Exception $e) {
+            Log::error('Error uploading multiple documents: ' . $e->getMessage());
+            return response()->json(new WithoutDataResource(
+                Response::HTTP_INTERNAL_SERVER_ERROR,
+                'Server Error',
+                'Terjadi kesalahan saat mengunggah dokumen. ' . $e->getMessage()
             ), Response::HTTP_INTERNAL_SERVER_ERROR);
         }
     }
