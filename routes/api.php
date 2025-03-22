@@ -11,7 +11,6 @@ Route::group(['prefix' => 'docs'], function () {
         Route::get('/logout', [LoginController::class, 'logout']);
         Route::post('/get-file', [DocumentController::class, 'getFile']);
         Route::post('/upload-file-multiple', [DocumentController::class, 'uploadMultipleFiles']);
-        Route::post('/upload-file', [DocumentController::class, 'uploadFile']);
-        Route::post('/delete-file', [DocumentController::class, 'deleteFile']);
+        Route::post('/delete-file-multiple', [DocumentController::class, 'deleteFile']);
     });
 });

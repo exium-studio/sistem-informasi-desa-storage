@@ -26,14 +26,17 @@ class GetDocumentRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'file_id' => ['required'],
+            'file_id' => ['required', 'array'],
+            'file_id.*' => ['required', 'uuid'],
         ];
     }
 
     public function messages()
     {
         return [
-            'file_id.required' => 'ID File tidak diperbolehkan kosong.',
+            'file_id.required' => 'ID file tidak boleh kosong.',
+            'file_id.array' => 'ID file harus berupa array.',
+            'file_id.*.uuid' => 'Setiap ID file harus berupa UUID.',
         ];
     }
 

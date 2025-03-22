@@ -41,53 +41,6 @@ class DocumentController extends Controller
         }
     }
 
-    public function uploadFile(CreateDocumentRequest $request)
-    {
-        $validation = $request->validated();
-
-        try {
-            $file = $request->file('file');
-
-            $filename = Str::random(35);
-            $mimeType = $file->getClientMimeType();
-            $size = $this->getFileSize($file);
-            $fileId = Str::uuid()->toString();
-
-            // Simpan file (tanpa ekstensi)
-            $filePath = "documents/{$filename}"; // Simpan di storage/app/public/documents
-            Storage::put("public/{$filePath}", file_get_contents($file));
-
-            $document = Document::create([
-                'id' => $fileId,
-                'user_id' => auth()->id(),
-                'filename' => $filename,
-                'path' => $filePath,
-                'mime_type' => $mimeType,
-                'size' => $size,
-            ]);
-
-            return response()->json(new WithDataResource(
-                Response::HTTP_CREATED,
-                'File berhasil diunggah.',
-                'File berhasil diunggah kedalam server.',
-                [
-                    'file_id' => $document->id,
-                    'filename' => $document->filename,
-                    'url' => Storage::url("public/{$filePath}"),
-                    'mime_type' => $document->mime_type,
-                    'size' => $this->formatFileSize($document->size),
-                ]
-            ), Response::HTTP_CREATED);
-        } catch (\Exception $e) {
-            Log::error('Error uploading document: ' . $e->getMessage());
-            return response()->json(new WithoutDataResource(
-                Response::HTTP_INTERNAL_SERVER_ERROR,
-                'Server Error',
-                'Terjadi kesalahan saat mengunggah dokumen.'
-            ), Response::HTTP_INTERNAL_SERVER_ERROR);
-        }
-    }
-
     public function uploadMultipleFiles(CreateMultipleDocumentsRequest $request)
     {
         $validation = $request->validated();
@@ -142,25 +95,28 @@ class DocumentController extends Controller
 
     public function deleteFile(GetDocumentRequest $request)
     {
-        $validation = $request->validated();
+        $request->validated();
 
         try {
-            $document = Document::where('id', $validation['file_id'])->first();
-            if (!$document || !Storage::exists("public/{$document->path}")) {
-                return response()->json(new WithoutDataResource(
-                    Response::HTTP_NOT_FOUND,
-                    'Dokumen Tidak Ditemukan',
-                    'File dengan ID yang diberikan tidak tersedia.'
-                ), Response::HTTP_NOT_FOUND);
+            $deleted = [];
+
+            foreach ($request->file_id as $fileId) {
+                $document = Document::where('id', $fileId)->first();
+
+                if ($document && Storage::exists("public/{$document->path}")) {
+                    Storage::delete("public/{$document->path}");
+                    $document->delete();
+                    $deleted[] = $fileId;
+                } else {
+                    Log::warning("Dokumen tidak ditemukan atau tidak ada di storage: {$fileId}");
+                }
             }
 
-            Storage::delete("public/{$document->path}");
-            $document->delete();
-
-            return response()->json(new WithoutDataResource(
+            return response()->json(new WithDataResource(
                 Response::HTTP_OK,
                 'Dokumen Berhasil Dihapus',
-                'Dokumen berhasil dihapus.'
+                'Dokumen berhasil dihapus.',
+                $deleted
             ), Response::HTTP_OK);
         } catch (\Exception $e) {
             Log::error('Error deleting document: ' . $e->getMessage());
